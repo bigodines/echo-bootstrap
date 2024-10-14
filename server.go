@@ -16,7 +16,7 @@ type (
 	}
 
 	CheckInRequest struct {
-		// BestBy 1/2025: double check all datatypes in this struct
+		// TODO: BestBy 1/2025: double check all datatypes in this struct
 		UserID    int    `json:"user_id"`
 		Timestamp string `json:"timestamp"`
 		Date      string `json:"date"`
@@ -26,6 +26,13 @@ type (
 	GetCheckInRequest struct {
 		UserID string
 	}
+
+	GetCheckInResponse struct {
+		Metric int64
+	}
+
+	GetCheckinsRow struct {
+	}
 )
 
 func (s *Service) PostCheckIn(req CheckInRequest) error {
@@ -33,8 +40,13 @@ func (s *Service) PostCheckIn(req CheckInRequest) error {
 	return err
 }
 
-func (s *Service) GetCheckIns() (GetCheckInRequest, error) {
-	return nil, nil
+func (s *Service) GetCheckInCount(userID string) (GetCheckInResponse, error) {
+	var count int
+	err := s.db.QueryRow("SELECT COUNT(*) from check_in WHERE user_id = ? GROUP BY user_id", userID).Scan(&count)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return GetCheckInResponse{Metric: int64(count)}, err
 }
 
 func main() {
@@ -56,17 +68,36 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", MainPage)
+	e.GET("/check_in", GetCheckins(*CheckInService))
+
+	e.POST("/check_in", Inc(*CheckInService))
 
 	e.Logger.Fatal(e.Start(":8001"))
 }
 
-func Inc(c echo.Context) error {
-	// retrieve the value of variable "metric" from request body
-	metric := c.FormValue("metric")
+func Inc(service Service) func(context2 echo.Context) error {
+	return func(c echo.Context) error {
+		// retrieve the value of variable "metric" from request body
+		metric := c.FormValue("metric")
 
-	return c.String(http.StatusOK, metric)
+		return c.String(http.StatusOK, metric)
+	}
 }
 
+func GetCheckins(service Service) func(context2 echo.Context) error {
+	return func(c echo.Context) error {
+		userID := c.QueryParam("user_id")
+
+		r, err := service.GetCheckInCount(userID)
+		if err != nil {
+			fmt.Errorf("error: %v", err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.JSON(http.StatusOK, r)
+	}
+}
+
+// BestBy 01/2025 - have a better default route.
 func MainPage(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, World!")
 }
