@@ -68,9 +68,9 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", MainPage)
-	e.GET("/check_in", GetCheckins(*CheckInService))
+	e.GET("/check-in", GetCheckins(*CheckInService))
 
-	e.POST("/check_in", Inc(*CheckInService))
+	e.POST("/check-in", Inc(*CheckInService))
 
 	e.Logger.Fatal(e.Start(":8001"))
 }
