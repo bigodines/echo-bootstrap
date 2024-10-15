@@ -50,7 +50,7 @@ func (s *Service) GetCheckInCount(userID string) (GetCheckInResponse, error) {
 }
 
 func main() {
-	db, err := sql.Open("sqlite3", "./maain.db")
+	db, err := sql.Open("sqlite3", "./main.db")
 	if err != nil {
 		log.Fatal(err)
 	}
