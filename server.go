@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"echo-bootstrap/checkin"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,45 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type (
-	Service struct {
-		db *sql.DB
-	}
-
-	CheckInRequest struct {
-		// TODO: BestBy 1/2025: double check all datatypes in this struct
-		UserID    int    `json:"user_id"`
-		Timestamp string `json:"timestamp"`
-		Date      string `json:"date"`
-		Payload   string `json:"payload"`
-	}
-
-	GetCheckInRequest struct {
-		UserID string
-	}
-
-	GetCheckInResponse struct {
-		Metric int64
-	}
-
-	GetCheckinsRow struct {
-	}
-)
-
-func (s *Service) PostCheckIn(req CheckInRequest) error {
-	_, err := s.db.Exec("INSERT INTO check_in (user_id, timestamp, date, payload) VALUES (?, ?, ?, ?)", req.UserID, req.Timestamp, req.Date, req.Payload)
-	return err
-}
-
-func (s *Service) GetCheckInCount(userID string) (GetCheckInResponse, error) {
-	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) from check_in WHERE user_id = ? GROUP BY user_id", userID).Scan(&count)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return GetCheckInResponse{Metric: int64(count)}, err
-}
-
 func main() {
 	db, err := sql.Open("sqlite3", "./main.db")
 	if err != nil {
@@ -56,13 +18,19 @@ func main() {
 	}
 	defer db.Close()
 
-	CheckInService := &Service{db: db}
-	fmt.Printf("+%v\n", CheckInService)
+	CheckInService := &checkin.Service{DB: db}
+	fmt.Printf("Setup... \n", CheckInService)
+	// BestBy 12/2024 - this shouldn't be necessary and definitely not live in main()
 	createTableStatement := `CREATE TABLE IF NOT EXISTS check_in (id INTEGER PRIMARY KEY, user_id INTEGER, timestamp INTEGER, date TEXT, payload TEXT)`
 	_, err = db.Exec(createTableStatement)
 	if err != nil {
 		log.Printf("%q: %s\n", err, createTableStatement)
 		return
+	}
+	// load sample data into the database
+	err = CheckInService.AddCheckIn(checkin.CheckInRequest{UserID: 1, Timestamp: "2021-01-01", Date: "2021-01-01", Payload: "payload"})
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	e := echo.New()
@@ -75,7 +43,7 @@ func main() {
 	e.Logger.Fatal(e.Start(":8001"))
 }
 
-func Inc(service Service) func(context2 echo.Context) error {
+func Inc(service checkin.Service) func(context2 echo.Context) error {
 	return func(c echo.Context) error {
 		// retrieve the value of variable "metric" from request body
 		metric := c.FormValue("metric")
@@ -84,7 +52,7 @@ func Inc(service Service) func(context2 echo.Context) error {
 	}
 }
 
-func GetCheckins(service Service) func(context2 echo.Context) error {
+func GetCheckins(service checkin.Service) func(context2 echo.Context) error {
 	return func(c echo.Context) error {
 		userID := c.QueryParam("user_id")
 
