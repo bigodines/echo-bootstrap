@@ -36,9 +36,10 @@ func main() {
 	e := echo.New()
 
 	e.GET("/", MainPage)
-	e.GET("/check-in", GetCheckinHandler)
 
+	e.GET("/check-in", GetCheckinHandler)
 	e.POST("/check-in", PostCheckinHandler)
+	e.DELETE("/check-in/:id", DeleteCheckinHandler)
 
 	e.Logger.Fatal(e.Start(":8001"))
 }
@@ -71,6 +72,17 @@ func PostCheckinHandler(c echo.Context) error {
 	}
 
 	err := checkingService.AddCheckIn(req)
+	if err != nil {
+		fmt.Errorf("error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+func DeleteCheckinHandler(c echo.Context) error {
+	id := c.Param("id")
+
+	err := checkingService.DeleteCheckIn(id)
 	if err != nil {
 		fmt.Errorf("error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)

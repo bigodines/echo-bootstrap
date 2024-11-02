@@ -1,6 +1,7 @@
 package checkin
 
 import (
+	"context"
 	"database/sql"
 	"log"
 )
@@ -19,14 +20,21 @@ type (
 	}
 
 	GetCheckInRequest struct {
-		UserID string
+		UserID    string
+		DateFrom  string
+		DateUntil string
 	}
 
-	GetCheckInResponse struct {
+	GetCheckInCountResponse struct {
 		Count int64
 	}
 
-	GetCheckinsRow struct {
+	GetCheckInResponse struct {
+		ID        int    `json:"id"`
+		UserID    int    `json:"user_id"`
+		Timestamp string `json:"timestamp"`
+		Date      string `json:"date"`
+		Payload   string `json:"payload"`
 	}
 )
 
@@ -35,11 +43,36 @@ func (s *Service) AddCheckIn(req AddCheckInRequest) error {
 	return err
 }
 
-func (s *Service) GetCheckInCount(userID string) (GetCheckInResponse, error) {
+func (s *Service) GetCheckInCount(userID string) (GetCheckInCountResponse, error) {
 	var count int
 	err := s.DB.QueryRow("SELECT COUNT(*) from check_in WHERE user_id = ? GROUP BY user_id", userID).Scan(&count)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return GetCheckInResponse{Count: int64(count)}, err
+	return GetCheckInCountResponse{Count: int64(count)}, err
+}
+
+func (s *Service) GetCheckIns(req GetCheckInRequest) ([]GetCheckInResponse, error) {
+	var checkIn []GetCheckInResponse
+	// TODO: support date range
+	rows, err := s.DB.QueryContext(context.Background(), "SELECT * FROM check_in WHERE user_id = ?", req.UserID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var r GetCheckInResponse
+		if err := rows.Scan(&r.ID, &r.UserID, &r.Timestamp, &r.Date, &r.Payload); err != nil {
+			log.Fatal(err)
+		}
+		checkIn = append(checkIn, r)
+	}
+
+	return checkIn, err
+}
+
+func (s *Service) DeleteCheckIn(id string) error {
+	_, err := s.DB.Exec("DELETE FROM check_in WHERE id = ?", id)
+	return err
 }
